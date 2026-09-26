@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenCode Brave Bridge</title>
+<link rel="stylesheet" href="popup.css">
+<main>
+  <h1>OpenCode Bridge</h1>
+  <p id="project">Waiting for a project status request…</p>
+  <p>Grant access for the selected tab’s group and origin only.</p>
+  <button id="grant" disabled>Grant selected tab/group</button>
+  <label>Additional origin (optional)
+    <input id="origin" type="url" placeholder="https://example.com">
+  </label>
+  <button id="add-origin" disabled>Approve origin for selected group</button>
+  <button id="revoke" disabled>Revoke project grant</button>
+  <p id="status" role="status"></p>
+</main>
+<script src="popup.js"></script>
+</html>

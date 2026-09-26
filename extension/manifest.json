@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "OpenCode Brave Bridge",
+  "version": "0.1.0",
+  "description": "User-authorized, read-only tab bridge for OpenCode.",
+  "permissions": ["nativeMessaging", "storage", "tabs", "tabGroups", "scripting"],
+  "optional_host_permissions": ["https://*/*", "http://127.0.0.1/*"],
+  "background": { "service_worker": "service-worker.js" },
+  "action": { "default_popup": "popup.html" }
+}
