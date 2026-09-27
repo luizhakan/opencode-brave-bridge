@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { acceptExtension } from './host.js';
-import { createBridge, socketPath } from './host.js';
+import { createBridge } from './host.js';
 import { encodeNative, NativeFrameDecoder } from './framing.js';
 
 test('extension responses are correlated back as native frames', async () => {
@@ -18,11 +21,13 @@ test('extension responses are correlated back as native frames', async () => {
 });
 
 test('routes interleaved responses to their requesting MCP clients and drops disconnected requests', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'brave-bridge-host-test-'));
+  const socketPath = path.join(dir, 'bridge.sock');
   const input = new EventEmitter(); const output = new PassThrough();
   const decoder = new NativeFrameDecoder(); const sent = [];
   output.on('data', chunk => sent.push(...decoder.push(chunk).filter(message => message.event !== 'ready')));
   acceptExtension(input, output);
-  const server = await createBridge();
+  const server = await createBridge(socketPath);
   await new Promise(resolve => server.listening ? resolve() : server.once('listening', resolve));
   const connect = () => new Promise((resolve, reject) => {
     const socket = net.createConnection(socketPath, () => resolve(socket));
@@ -57,5 +62,6 @@ test('routes interleaved responses to their requesting MCP clients and drops dis
   } finally {
     first.destroy(); second.destroy();
     await new Promise(resolve => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
   }
 });

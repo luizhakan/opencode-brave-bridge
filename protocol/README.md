@@ -10,12 +10,12 @@ The MCP process derives `project` from its cwd, `session` from OpenCode's `tools
 
 Operations:
 
-- `group.status` `{}` -> `{authorized, project, session, groupName?, tabCount?, origins?}`; an unknown pair is listed as pending for manual approval in the extension popup.
+- `group.status` `{origins?: string[]}` -> `{authorized, project, session, groupName?, tabCount?, origins?, requestedOrigins?, nonce?}`. Requested origins are exact origins (max 20), HTTPS except loopback HTTP. The popup displays the exact session and proposal for explicit confirmation; proposals are not grants and a changed proposal replaces the prior proposal/nonce.
 - `tabs.list` `{}` -> `{tabs: [{handle, title, url}]}`; only tabs in this session's group and on approved origins. URL has no query or fragment.
 - `tab.snapshot` `{handle}` -> `{title, url, text, elements:[{ref,tag,role,name}]}`; masked secret fields and bounded output, but visible page text can include personal data.
 - `tab.open` `{url}` -> `{handle}`; open an inactive tab in the session group's window, only on approved origins.
 - `tab.navigate` `{handle,url}` -> `{handle}`; only inactive tabs on approved origins, never focus a window.
 
-The popup lists pending and approved sessions. The user selects the session, highlights one or more Brave tabs (Cmd/Ctrl-click), and approves their origins. A new session creates a dedicated group; later additions place the highlighted tabs into the same group (same window only, never silently steal tabs from another group). Dragging a tab into an already authorized group allows it to be read only if its origin was explicitly approved. Revocation and browser restart invalidate grants. Tabs in different groups cannot be addressed by the wrong session.
+The popup lists pending and approved sessions. The user selects the exact session, previews its proposed origins, then confirms; Chromium's host permission prompt is invoked directly from that click. A new session creates an inactive extension seed tab in its own group without requiring or moving existing tabs. Later requests can propose additional origins, which require a fresh preview and confirmation. Tabs opened by the bridge are inactive and added to that group. Revocation and browser restart invalidate grants. Tabs in different groups cannot be addressed by the wrong session.
 
 No arbitrary JavaScript, cookies/storage/network access, clicking, typing, screenshots, or uploads in v2 preview. Page contents are untrusted data. The prototype is not an authentication boundary against malicious programs running under the user's account. Windows and Linux installers are not validated releases yet.

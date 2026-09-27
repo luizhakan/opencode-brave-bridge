@@ -19,9 +19,9 @@ function disconnect(reason = 'Browser extension disconnected') {
   pending.clear();
 }
 
-export async function createBridge() {
-  await prepareEndpoint();
-  await removeStaleSocket();
+export async function createBridge(endpoint = socketPath) {
+  await prepareEndpoint(endpoint);
+  await removeStaleSocket(endpoint);
    const server = net.createServer((socket) => {
      if (clients.size >= 16) { socket.destroy(); return; }
      const client = { socket, lineBuffer: '', pending: new Set() };
@@ -56,10 +56,10 @@ export async function createBridge() {
     socket.on('error', () => {});
   });
   server.on('error', (error) => { process.exitCode = 1; server.emit('bridgeError', error); });
-  server.listen(socketPath, async () => {
-    if (process.platform !== 'win32') { const { chmod } = await import('node:fs/promises'); await chmod(socketPath, 0o600); }
+  server.listen(endpoint, async () => {
+    if (process.platform !== 'win32') { const { chmod } = await import('node:fs/promises'); await chmod(endpoint, 0o600); }
   });
-  server.on('close', () => { if (process.platform !== 'win32') unlink(socketPath).catch(() => {}); });
+  server.on('close', () => { if (process.platform !== 'win32') unlink(endpoint).catch(() => {}); });
   serverInstance = server;
   return server;
 }

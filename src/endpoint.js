@@ -19,24 +19,24 @@ export const socketPath = process.platform === 'win32'
   ? `\\\\.\\pipe\\opencode-brave-bridge-${windowsSid()}`
   : path.join(os.homedir(), '.opencode', 'brave-bridge', 'bridge.sock');
 
-export async function prepareEndpoint() {
-  if (process.platform === 'win32') return;
-  const dir = path.dirname(socketPath);
+export async function prepareEndpoint(endpoint = socketPath) {
+  if (process.platform === 'win32' && endpoint === socketPath) return;
+  const dir = path.dirname(endpoint);
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await chmod(dir, 0o700);
 }
 
-export function removeStaleSocket() {
+export function removeStaleSocket(endpoint = socketPath) {
   return new Promise((resolve, reject) => {
-    const probe = net.createConnection(socketPath);
+    const probe = net.createConnection(endpoint);
     probe.once('connect', () => { probe.destroy(); reject(Object.assign(new Error('Bridge socket already active'), { code: 'EADDRINUSE' })); });
     probe.once('error', async error => {
       if (error.code !== 'ECONNREFUSED' && error.code !== 'ENOENT') return reject(error);
       if (error.code === 'ECONNREFUSED') {
         try {
-          const entry = await lstat(socketPath);
+          const entry = await lstat(endpoint);
           if (!entry.isSocket() || entry.uid !== process.getuid()) return reject(new Error('Refusing to remove a foreign or non-socket path'));
-          await unlink(socketPath);
+          await unlink(endpoint);
         } catch (e) { if (e.code !== 'ENOENT') return reject(e); }
       }
       resolve();
