@@ -2,7 +2,7 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 case "$(uname -s)" in
- Darwin) DATA="$HOME/Library/Application Support/opencode-brave-bridge"; HOSTS="$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"; BRAVE='/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' ;;
+ Darwin) DATA="$HOME/Library/Application Support/opencode-brave-bridge"; HOSTS="$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"; COMPAT_HOSTS="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"; BRAVE='/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' ;;
  Linux) DATA="${XDG_DATA_HOME:-$HOME/.local/share}/opencode-brave-bridge"; HOSTS="$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"; BRAVE=$(command -v brave-browser || command -v brave || true) ;;
  *) echo 'Use installers/install.ps1.' >&2; exit 1;;
 esac
@@ -32,5 +32,15 @@ NATIVE="$HOSTS/dev.opencode.brave_bridge.json"
 NATIVE_PATH=$NATIVE BRAVE_PATH=$BRAVE_PATH EXT_ID=$EXT_ID DATA=$DATA "$NODE" <<'NODE'
 const fs=require('fs');fs.writeFileSync(process.env.NATIVE_PATH,JSON.stringify({name:'dev.opencode.brave_bridge',description:'OpenCode Brave Bridge',path:process.env.DATA+'/launch-host',type:'stdio',allowed_origins:[`chrome-extension://${process.env.EXT_ID}/`]},null,2)+'\n')
 NODE
+if [ "$(uname -s)" = Darwin ]; then
+  # Brave 1.96 on this Mac resolves native hosts via the Chrome user-level
+  # lookup directory. Keep Brave's own manifest and install the same, narrowly
+  # scoped host in the compatibility directory; never overwrite another host.
+  mkdir -p "$COMPAT_HOSTS"
+  if [ -e "$COMPAT_HOSTS/dev.opencode.brave_bridge.json" ] && ! cmp -s "$NATIVE" "$COMPAT_HOSTS/dev.opencode.brave_bridge.json"; then
+    echo 'Existing Chrome native host with this name differs; refusing to overwrite.' >&2; exit 1
+  fi
+  cp "$NATIVE" "$COMPAT_HOSTS/dev.opencode.brave_bridge.json"
+fi
 if command -v opencode >/dev/null 2>&1; then opencode mcp add brave --global -- "$DATA/launch-mcp" || echo 'Falha ao configurar MCP global.' >&2; else echo 'OpenCode CLI indisponível; configure: opencode mcp add brave --global -- "<caminho>/launch-mcp"'; fi
 echo "Instalado em $DATA. Brave verificado: ${BRAVE_PATH:-não encontrado (instale Brave)}"
