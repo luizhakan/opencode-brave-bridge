@@ -71,7 +71,8 @@ test('native host bridges a newline MCP request and cleans up on stdin EOF', asy
     child.stdout.on('data', chunk => {
       try {
         const messages = decoder.push(chunk);
-        if (messages.length) { clearTimeout(timer); nativeFrame = messages[0]; resolve(messages[0]); }
+        const requests = messages.filter(message => message.event !== 'ready');
+        if (requests.length) { clearTimeout(timer); nativeFrame = requests[0]; resolve(requests[0]); }
       } catch (error) { clearTimeout(timer); reject(error); }
     });
   });

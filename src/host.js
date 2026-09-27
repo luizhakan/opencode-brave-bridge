@@ -87,6 +87,7 @@ export function acceptExtension(input = process.stdin, output = process.stdout) 
   // Native protocol stdout is reserved exclusively for framed messages.
   output.on('error', () => disconnect());
   extension = { destroyed: false, write(frame) { output.write(frame); }, destroy() { this.destroyed = true; } };
+  output.write(encodeNative({ v: 2, event: 'ready' }));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

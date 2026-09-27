@@ -13,14 +13,14 @@ test('extension responses are correlated back as native frames', async () => {
   acceptExtension(input, output);
   // Establish an MCP-side request via exported bridge path is integration-owned; framing path validates response serialization.
   input.emit('data', encodeNative({ v: 2, id: 'unknown', ok: true, result: {} }));
-  assert.equal(received.length, 0);
+  assert.deepEqual(new NativeFrameDecoder().push(Buffer.concat(received)), [{ v: 2, event: 'ready' }]);
   assert.deepEqual(new NativeFrameDecoder().push(encodeNative({ ok: true })), [{ ok: true }]);
 });
 
 test('routes interleaved responses to their requesting MCP clients and drops disconnected requests', async () => {
   const input = new EventEmitter(); const output = new PassThrough();
   const decoder = new NativeFrameDecoder(); const sent = [];
-  output.on('data', chunk => sent.push(...decoder.push(chunk)));
+  output.on('data', chunk => sent.push(...decoder.push(chunk).filter(message => message.event !== 'ready')));
   acceptExtension(input, output);
   const server = await createBridge();
   await new Promise(resolve => server.listening ? resolve() : server.once('listening', resolve));
