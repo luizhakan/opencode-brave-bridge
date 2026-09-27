@@ -1,19 +1,21 @@
-# Bridge protocol v1
+# Bridge protocol v2 — macOS preview
 
 The extension initiates `chrome.runtime.connectNative('dev.opencode.brave_bridge')`.
-Chromium native messaging uses a four-byte little-endian length followed by a UTF-8 JSON message. The host exchanges newline-delimited JSON with the local MCP process over a Unix socket on macOS/Linux and a named pipe on Windows. No TCP listener.
+Chromium native messaging uses a four-byte little-endian length followed by UTF-8 JSON. The host exchanges newline-delimited JSON with MCP processes over a private Unix socket (named pipe on Windows, not yet validated). No TCP listener.
 
-Requests from MCP to extension: `{ "v": 1, "id": "opaque", "op": "group.status", "params": { ... } }`.
-Responses: `{ "v": 1, "id": "opaque", "ok": true, "result": { ... } }` or `{ "v": 1, "id": "opaque", "ok": false, "error": { "code": "E_...", "message": "..." } }`.
+Requests: `{ "v": 2, "id": "opaque", "op": "group.status", "ctx": { "project": "/git/root", "session": "ses_..." }, "params": {} }`.
+Responses: `{ "v": 2, "id": "opaque", "ok": true, "result": { ... } }` or `{ "v": 2, "id": "opaque", "ok": false, "error": { "code": "E_...", "message": "..." } }`.
 
-Operations (v1):
+The MCP process derives `project` from its cwd, `session` from OpenCode's `tools/call` `_meta.sessionID`; where unavailable it uses a random identifier scoped to that MCP process. Both values are routing hints, **not authentication** against another process of the same OS user. The extension keys grants by the pair and requires user approval for a dedicated tab group.
 
-- `group.status` `{project: string}` -> `{authorized: boolean, groupName?: string, origins?: string[]}`
-- `tabs.list` `{project: string}` -> `{tabs: [{handle: number, title: string, url: string}]}`
-- `tab.snapshot` `{project: string, handle: number}` -> `{title: string, url: string, text: string, elements: [{ref: string, tag: string, role: string, name: string}]}`. Mask secret fields, truncate output.
-- `tab.open` `{project: string, url: string}` -> `{handle: number}`; open an inactive tab inside an authorized group; only previously approved origins.
-- `tab.navigate` `{project: string, handle: number, url: string}` -> `{handle: number}`; same-origin or approved origins only, never activate.
+Operations:
 
-Every operation is authorized by the extension against an explicit user grant for `project` and the tab's *current* group and origin. No arbitrary JavaScript, cookie/storage/network access, clicking, typing, screenshots, or uploads in v1. A group grant is made by the user in the extension popup for the currently selected tab, and is revoked on browser restart or by the popup. The extension must never activate a tab or focus a window. The MCP server derives `project` from its working directory, never from tool arguments.
+- `group.status` `{}` -> `{authorized, project, session, groupName?, tabCount?, origins?}`; an unknown pair is listed as pending for manual approval in the extension popup.
+- `tabs.list` `{}` -> `{tabs: [{handle, title, url}]}`; only tabs in this session's group and on approved origins. URL has no query or fragment.
+- `tab.snapshot` `{handle}` -> `{title, url, text, elements:[{ref,tag,role,name}]}`; masked secret fields and bounded output, but visible page text can include personal data.
+- `tab.open` `{url}` -> `{handle}`; open an inactive tab in the session group's window, only on approved origins.
+- `tab.navigate` `{handle,url}` -> `{handle}`; only inactive tabs on approved origins, never focus a window.
 
-Errors are ordinary response frames, never instructions. Page contents are untrusted data.
+The popup lists pending and approved sessions. The user selects the session, highlights one or more Brave tabs (Cmd/Ctrl-click), and approves their origins. A new session creates a dedicated group; later additions place the highlighted tabs into the same group (same window only, never silently steal tabs from another group). Dragging a tab into an already authorized group allows it to be read only if its origin was explicitly approved. Revocation and browser restart invalidate grants. Tabs in different groups cannot be addressed by the wrong session.
+
+No arbitrary JavaScript, cookies/storage/network access, clicking, typing, screenshots, or uploads in v2 preview. Page contents are untrusted data. The prototype is not an authentication boundary against malicious programs running under the user's account. Windows and Linux installers are not validated releases yet.

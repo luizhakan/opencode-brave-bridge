@@ -1,6 +1,10 @@
-body { width: 320px; margin: 0; color: #222; font: 14px system-ui, sans-serif; }
+body { width: 340px; margin: 0; color: #222; font: 14px system-ui, sans-serif; }
 main { padding: 16px; }
 h1 { font-size: 18px; margin: 0 0 12px; }
-button, input { box-sizing: border-box; width: 100%; margin: 6px 0; padding: 9px; }
-label { display: block; margin-top: 12px; }
+button, select { box-sizing: border-box; width: 100%; margin: 6px 0; padding: 9px; }
+label { display: block; font-weight: 600; }
+select { height: 132px; }
 #status { min-height: 1em; overflow-wrap: anywhere; }
+section { border: 1px solid #bbb; padding: 8px; margin: 8px 0; overflow-wrap: anywhere; }
+section p { margin: 4px 0; }
+#tabPreview { padding-left: 20px; }

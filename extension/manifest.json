@@ -3,8 +3,22 @@
   "name": "OpenCode Brave Bridge",
   "version": "0.1.0",
   "description": "User-authorized, read-only tab bridge for OpenCode.",
-  "permissions": ["nativeMessaging", "storage", "tabs", "tabGroups", "scripting"],
-  "optional_host_permissions": ["https://*/*", "http://127.0.0.1/*"],
-  "background": { "service_worker": "service-worker.js" },
-  "action": { "default_popup": "popup.html" }
+  "permissions": [
+    "nativeMessaging",
+    "storage",
+    "tabs",
+    "tabGroups",
+    "scripting"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA14HejGOSOpdEVwxlWiFzwfO4gKC9OS43Qq5QjhcRlc0UnC4zQYft0yN5h+BSILFAV7Gadr4PqJeSiTLdB1NCzD7+cdlINjlBF1/n94XWdbtJeSXgIr56YAJt7Pcqe/y/Zx7PhAbxOh9Fbcu7FzlzD8Ogu9GFy3UDV8NbRdFZGGEXQQ0ELbCLAUXhy9AGreBJ58oSVeeXOUwwnQ0krtVKVYD4DALchTztiQA8maDMeU3zdUCRoe399Umh4mCxVp5MZKamQNHUVxvMMQhnMdB4AdT3pWgmaqYonzM3Ho4SRJIP5iBBF2605XDinzE63zFHsb7NK8k+ALrEE3Fj6YMIFwIDAQAB"
 }

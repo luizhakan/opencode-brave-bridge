@@ -6,5 +6,5 @@ case "$(uname -s)" in
  *) echo 'Use installers/doctor.ps1.' >&2; exit 1;;
 esac
 echo "Node: $(command -v node || echo ausente)"; node --version 2>/dev/null || true
-for f in "$DATA/src/index.js" "$DATA/extension/manifest.json" "$HOSTS/dev.opencode.brave_bridge.json"; do if [ -f "$f" ]; then echo "OK $f"; else echo "FALTA $f"; fi; done
+for f in "$DATA/src/host.js" "$DATA/src/mcp.js" "$DATA/launch-host" "$DATA/launch-mcp" "$DATA/package.json" "$DATA/node_modules" "$DATA/extension/manifest.json" "$HOSTS/dev.opencode.brave_bridge.json"; do if [ -e "$f" ]; then echo "OK $f"; else echo "FALTA $f"; fi; done
 if command -v opencode >/dev/null 2>&1; then opencode mcp list; else echo 'OpenCode CLI indisponível'; fi
