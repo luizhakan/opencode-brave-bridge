@@ -16,6 +16,22 @@
   <section id="previewDetails" hidden><strong>Authorization preview</strong><ul id="tabPreview"></ul><p id="origins"></p></section>
   <button id="grant" disabled>Confirm and authorize</button>
   <button id="revoke" disabled>Revoke selected session</button>
+  <section id="clickSection" hidden>
+    <strong>Click access</strong>
+    <p id="clickStatus" role="status"></p>
+    <div id="clickRequestNotice" hidden>
+      <p>This session is requesting permission to click and interact with pages, not just read them.</p>
+      <button id="previewClick">Preview click access</button>
+    </div>
+    <section id="clickPreview" hidden>
+      <p id="clickWarning" role="alert">Warning: allowing clicks lets the agent take actions that can change your account or data at these origins (for example submitting forms or making purchases). This grants standing click access for the session below &mdash; you will not be asked to confirm each individual click.</p>
+      <p id="clickPreviewScope"></p>
+      <p>Origins:</p>
+      <ul id="clickPreviewOrigins"></ul>
+      <button id="grantClick" disabled>Confirm allow clicks</button>
+    </section>
+    <button id="revokeClick" hidden>Revoke click access</button>
+  </section>
   <p id="status" role="status" aria-live="polite"></p>
 </main>
 <script src="popup.js"></script>

@@ -4,14 +4,17 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const source=await readFile(new URL('./service-worker.js',import.meta.url),'utf8');
-function harness({tabs=[],grants={},windows=[{id:1,focused:true,type:'normal'}],groupError,updateError}={}) {
+function harness({tabs=[],grants={},windows=[{id:1,focused:true,type:'normal'}],groupError,updateError,element:elementOptions={tag:'BUTTON',name:'Continue'}}={}) {
   const ev={},store={...grants},responses=[],calls={groups:[],updates:[],creates:[],removed:[],permissionRemovals:[]}; let nextGroup=20,nextTab=100;
   const event=n=>({addListener(fn){(ev[n]||=[]).push(fn);}}), port={onMessage:event('native'),onDisconnect:event('disconnect'),postMessage:m=>responses.push(m)};
-  const chrome={runtime:{id:'extension-id',getURL:x=>'chrome-extension://extension-id/'+x,onStartup:event('startup'),onInstalled:event('installed'),onConnect:event('connect'),onMessage:event('message'),connectNative:()=>port},windows:{async getAll(){return windows}},storage:{session:{async get(){return {...store}},async set(o){Object.assign(store,o)},async remove(k){delete store[k]},async clear(){for(const k of Object.keys(store))delete store[k]}}},permissions:{async contains(){return true},async remove(x){calls.permissionRemovals.push(x)}},tabGroups:{onRemoved:event('removed'),async get(id){const tab=tabs.find(t=>t.groupId===id);if(!tab&&!Object.values(store).some(g=>g.groupId===id))throw Error('missing group');return{id,title:'old',windowId:tab?.windowId??1}},async update(id,x){calls.updates.push({id,...x});if(updateError)throw updateError}},tabs:{async query(){return tabs},async get(id){const t=tabs.find(x=>x.id===id);if(!t)throw Error('missing tab');return t},async group(o){calls.groups.push(o);if(groupError)throw groupError;if(o.groupId!=null){for(const id of o.tabIds){const t=tabs.find(x=>x.id===id);if(t)t.groupId=o.groupId}return o.groupId} const id=nextGroup++; for(const tid of o.tabIds){const t=tabs.find(x=>x.id===tid);if(t)t.groupId=id}return id},async create(o){calls.creates.push(o);const tab={id:nextTab++,...o};tabs.push(tab);return tab},async remove(id){calls.removed.push(id);const i=tabs.findIndex(t=>t.id===id);if(i>=0)tabs.splice(i,1)},async update(){}},scripting:{async executeScript(){return[{result:{}}]}}};
+  const el={tagName:elementOptions.tag||'BUTTON',innerText:elementOptions.name||'',disabled:false,isConnected:true,form:null,click(){this.clicked=(this.clicked||0)+1},getAttribute(k){return ({role:'', 'aria-label':'','placeholder':'',type:elementOptions.type||'',href:elementOptions.href||'',formaction:elementOptions.formaction||'',target:elementOptions.target||'',ping:elementOptions.ping||''})[k]??null},matches(){return false},closest(){return null},getClientRects(){return[{}]},hasAttribute(k){return !!elementOptions[k]},...elementOptions.methods};
+  const document={title:'Test',body:{innerText:''},querySelectorAll(){return[el]}};
+  const world=vm.createContext({location:{origin:'https://ok.test',href:'https://ok.test/page'},document,getComputedStyle:()=>({visibility:'visible',display:'block'}),URL});
+  const chrome={runtime:{id:'extension-id',getURL:x=>'chrome-extension://extension-id/'+x,onStartup:event('startup'),onInstalled:event('installed'),onConnect:event('connect'),onMessage:event('message'),connectNative:()=>port},windows:{async getAll(){return windows}},storage:{session:{async get(){return {...store}},async set(o){Object.assign(store,o)},async remove(k){delete store[k]},async clear(){for(const k of Object.keys(store))delete store[k]}}},permissions:{async contains(){return true},async remove(x){calls.permissionRemovals.push(x)}},tabGroups:{onRemoved:event('removed'),async get(id){const tab=tabs.find(t=>t.groupId===id);if(!tab&&!Object.values(store).some(g=>g.groupId===id))throw Error('missing group');return{id,title:'old',windowId:tab?.windowId??1}},async update(id,x){calls.updates.push({id,...x});if(updateError)throw updateError}},tabs:{async query(){return tabs},async get(id){const t=tabs.find(x=>x.id===id);if(!t)throw Error('missing tab');return t},async group(o){calls.groups.push(o);if(groupError)throw groupError;if(o.groupId!=null){for(const id of o.tabIds){const t=tabs.find(x=>x.id===id);if(t)t.groupId=o.groupId}return o.groupId} const id=nextGroup++; for(const tid of o.tabIds){const t=tabs.find(x=>x.id===tid);if(t)t.groupId=id}return id},async create(o){calls.creates.push(o);const tab={id:nextTab++,...o};tabs.push(tab);return tab},async remove(id){calls.removed.push(id);const i=tabs.findIndex(t=>t.id===id);if(i>=0)tabs.splice(i,1)},async update(){}},scripting:{async executeScript(info){calls.scripts??=[];calls.scripts.push(info);world.location.origin=info.args.length===4?info.args[0]:info.args[2];world.location.href=world.location.origin+'/page';const func=vm.runInContext(`(${info.func.toString()})`,world);return[{documentId:'doc-1',result:func(...info.args)}]}}};
   vm.runInNewContext(source,{chrome,URL,Map,Object,Array,Number,Boolean,String,Error,Date,JSON,console,crypto:{randomUUID:()=>`nonce-${Math.random()}`}});
   const request=async(project,session,op,params={})=>{const req={v:2,id:String(responses.length),ctx:{project,session},op,params};await ev.native[0](req);return responses.at(-1)};
   const message=async m=>{let result;ev.message[0](m,{id:'extension-id',url:'chrome-extension://extension-id/popup.html'},x=>{result=x});for(let i=0;i<30&&!result;i++)await new Promise(r=>setImmediate(r));return result;};
-  return{request,message,calls,store,events:ev};
+  return{request,message,calls,store,events:ev,element:el,tabs};
 }
 const pending=async(h,p='P',s='ses_A',origins=['https://ok.test'])=>h.request(p,s,'group.status',{origins});
 
@@ -66,4 +69,34 @@ test('rejects untrusted or non-popup runtime messages',async()=>{
  const h=harness();await pending(h);
  let response;h.events.message[0]({type:'grant',key:'["P","ses_A"]',origins:['https://ok.test']},{id:'evil',url:'https://evil.test'},x=>response=x);
  assert.equal(response,undefined);assert.equal(h.calls.creates.length,0);
+});
+test('click consent is a separate, nonce-bound popup grant',async()=>{
+ const key='["P","ses_A"]',h=harness({grants:{[key]:{project:'P',session:'ses_A',groupId:7,windowId:1,origins:['https://ok.test']}}});
+ await h.request('P','ses_A','group.status',{requestClick:true});
+ const state=await h.message({type:'get-state'}),request=state.grants[0].clickRequest;
+ assert.deepEqual(JSON.parse(JSON.stringify(request.origins)),['https://ok.test']);assert.ok(request.nonce);
+ assert.equal((await h.message({type:'grant-click',key,nonce:'wrong'})).error!==undefined,true);
+ assert.ok((await h.request('P','ses_A','tab.click',{handle:1,snapshotId:'x',ref:'e1'})).error);
+ const result=await h.message({type:'grant-click',key,nonce:request.nonce});assert.equal(result.ok,true);
+  assert.deepEqual(Array.from(h.store[key].click.origins),['https://ok.test']);assert.ok(h.store[key].click.expiresAt>Date.now());
+ await h.message({type:'revoke-click',key});assert.equal(h.store[key].click,undefined);
+});
+
+const clickGrant={project:'P',session:'ses_A',groupId:7,windowId:1,origins:['https://ok.test'],click:{origins:['https://ok.test'],expiresAt:Date.now()+60000}};
+async function clickHarness(options={}){const h=harness({tabs:[{id:1,groupId:7,windowId:1,url:'https://ok.test/page',active:false}],grants:{'["P","ses_A"]':clickGrant},...options});const snap=await h.request('P','ses_A','tab.snapshot',{handle:1});return{...h,snap};}
+test('snapshot click uses documentId, succeeds once, and exposes no destinations',async()=>{
+ const h=await clickHarness();assert.equal(h.snap.ok,true,JSON.stringify(h.snap));const item=h.snap.result.elements[0];assert.equal(item.ref,'e1');assert.equal('href' in item,false);assert.equal('formaction' in item,false);
+ const args={handle:1,snapshotId:h.snap.result.snapshotId,ref:'e1'};assert.equal((await h.request('P','ses_A','tab.click',args)).result.clicked,true);assert.equal(h.element.clicked,1);
+ const injection=h.calls.scripts.at(-1);assert.deepEqual(Array.from(injection.target.documentIds),['doc-1']);assert.ok((await h.request('P','ses_A','tab.click',args)).error);assert.equal(h.element.clicked,1);
+});
+test('click rejects stale snapshots, different sessions, and active tabs',async()=>{
+ const h=await clickHarness(),a={handle:1,snapshotId:h.snap.result.snapshotId,ref:'e1'};assert.ok((await h.request('P','ses_B','tab.click',a)).error);h.tabs[0].active=true;assert.equal((await h.request('P','ses_A','tab.click',a)).error.code,'E_ACTIVE_TAB');
+});
+test('click rejects cross-origin form and link destinations',async()=>{
+ for(const element of [{tag:'BUTTON',formaction:'https://evil.test/'},{tag:'A',href:'https://evil.test/',methods:{closest(){return{getAttribute:k=>k==='href'?'https://evil.test/':null,hasAttribute:()=>false}}}}]){
+  const h=await clickHarness({element}),args={handle:1,snapshotId:h.snap.result.snapshotId,ref:'e1'};assert.ok((await h.request('P','ses_A','tab.click',args)).error);assert.equal(h.element.clicked,undefined);
+ }
+});
+test('click rejects changed descriptors',async()=>{
+ const h=await clickHarness(),args={handle:1,snapshotId:h.snap.result.snapshotId,ref:'e1'};h.element.innerText='Changed';assert.equal((await h.request('P','ses_A','tab.click',args)).error.code,'E_STALE');assert.equal(h.element.clicked,undefined);
 });

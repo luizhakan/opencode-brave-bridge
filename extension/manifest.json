@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "OpenCode Brave Bridge",
   "version": "0.1.0",
-  "description": "User-authorized, read-only tab bridge for OpenCode.",
+  "description": "User-authorized browser bridge with separately approved clicks for OpenCode.",
   "permissions": [
     "nativeMessaging",
     "storage",
