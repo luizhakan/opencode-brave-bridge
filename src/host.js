@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { unlink } from 'node:fs/promises';
 import { socketPath, prepareEndpoint, removeStaleSocket } from './endpoint.js';
 import { NativeFrameDecoder, encodeNative } from './framing.js';
+import { stageFile, getStage, discardStage } from './file-stage.js';
 
 export { socketPath };
 
@@ -36,10 +37,14 @@ export async function createBridge(endpoint = socketPath) {
          let request;
          try { request = JSON.parse(line); } catch { sendMcp(client, { id: null, ok: false, error: { code: 'E_PROTOCOL', message: 'Invalid JSON request' } }); continue; }
          if (!request || request.v !== 2 || typeof request.id !== 'string' || typeof request.op !== 'string' || !request.ctx || typeof request.ctx.project !== 'string' || typeof request.ctx.session !== 'string' || !request.params || typeof request.params !== 'object') {
-           sendMcp(client, { id: request?.id ?? null, ok: false, error: { code: 'E_PROTOCOL', message: 'Invalid request' } }); continue;
+            sendMcp(client, { id: request?.id ?? null, ok: false, error: { code: 'E_PROTOCOL', message: 'Protocol mismatch: expected v2 request with string id/op, project/session context, and object params' } }); continue;
          }
          if (client.pending.size >= 32 || pending.size >= 128) { sendMcp(client, { id: request.id, ok: false, error: { code: 'E_BUSY', message: 'Too many pending requests' } }); continue; }
-         if (!extension || extension.destroyed) { sendMcp(client, { id: request.id, ok: false, error: { code: 'E_DISCONNECTED', message: 'Browser extension disconnected' } }); continue; }
+          if (!extension || extension.destroyed) { sendMcp(client, { id: request.id, ok: false, error: { code: 'E_DISCONNECTED', message: 'Browser extension disconnected' } }); continue; }
+          if (request.op === 'file.stage' || request.op === 'file.commit') {
+            handleFileRequest(client, request);
+            continue;
+          }
          const id = `${process.pid}-${++nextId}`;
          const timer = setTimeout(() => { pending.delete(id); client.pending.delete(id); sendMcp(client, { id: request.id, ok: false, error: { code: 'E_TIMEOUT', message: 'Bridge request timed out' } }); }, 15000);
          client.pending.add(id);
@@ -55,13 +60,53 @@ export async function createBridge(endpoint = socketPath) {
      });
     socket.on('error', () => {});
   });
-  server.on('error', (error) => { process.exitCode = 1; server.emit('bridgeError', error); });
-  server.listen(endpoint, async () => {
-    if (process.platform !== 'win32') { const { chmod } = await import('node:fs/promises'); await chmod(endpoint, 0o600); }
-  });
-  server.on('close', () => { if (process.platform !== 'win32') unlink(endpoint).catch(() => {}); });
-  serverInstance = server;
+   server.on('error', (error) => { process.exitCode = 1; server.emit('bridgeError', error); });
+   let ownsEndpoint = false;
+  server.on('close', () => { if (ownsEndpoint && process.platform !== 'win32') unlink(endpoint).catch(() => {}); });
+   serverInstance = server;
+   await new Promise((resolve, reject) => {
+     const onError = error => { server.removeListener('listening', onListening); reject(error); };
+     const onListening = async () => {
+       server.removeListener('error', onError);
+       ownsEndpoint = true;
+       try {
+         if (process.platform !== 'win32') { const { chmod } = await import('node:fs/promises'); await chmod(endpoint, 0o600); }
+         resolve();
+       } catch (error) { server.close(); reject(error); }
+     };
+     server.once('error', onError);
+     server.once('listening', onListening);
+     server.listen(endpoint);
+   });
   return server;
+}
+
+async function handleFileRequest(client, request) {
+  const p = request.params;
+  try {
+    if (request.op === 'file.stage') {
+      const staged = await stageFile(request.ctx, p);
+      const response = await forwardExtension({ ...request, op: 'tab.upload.propose', params: { handle: p.handle, snapshotId: p.snapshotId, ref: p.ref, stageId: staged.stageId, name: staged.name, size: staged.size, sha256: staged.sha256, displayPath: staged.displayPath } });
+      if (!response.ok) { await discardStage(request.ctx, { ...p, stageId: staged.stageId }); throw Object.assign(new Error(response.error?.message || 'Upload proposal rejected'), { code: 'E_UPLOAD' }); }
+      sendMcp(client, { id: request.id, ok: true, result: { stageId: staged.stageId, name: staged.name, size: staged.size, sha256: staged.sha256, pending: true } });
+    } else {
+      const stage = await getStage(request.ctx, p);
+      const response = await forwardExtension({ ...request, op: 'tab.upload', params: { handle: p.handle, snapshotId: p.snapshotId, ref: p.ref, stageId: stage.stageId, name: stage.name, size: stage.size, sha256: stage.sha256, stagedPath: stage.stagedPath } }, 60000);
+      // The site reads the file asynchronously after it is attached; retain the
+      // immutable staged copy until its TTL expires instead of deleting it here.
+      sendMcp(client, { ...response, id: request.id });
+    }
+  } catch (error) { sendMcp(client, { id: request.id, ok: false, error: { code: 'E_UPLOAD', message: error.message || 'Upload failed' } }); }
+}
+
+function forwardExtension(request, timeout = 15000) {
+  return new Promise(resolve => {
+    if (!extension || extension.destroyed) return resolve({ ok: false, error: { code: 'E_DISCONNECTED', message: 'Browser extension disconnected' } });
+    const id = `${process.pid}-${++nextId}`;
+    const timer = setTimeout(() => { pending.delete(id); resolve({ ok: false, error: { code: 'E_TIMEOUT', message: 'Extension upload request timed out' } }); }, timeout);
+    pending.set(id, { timer, client: null, resolve: response => { clearTimeout(timer); resolve(response); } });
+    try { extension.write(encodeNative({ ...request, id })); } catch { clearTimeout(timer); pending.delete(id); resolve({ ok: false, error: { code: 'E_BRIDGE', message: 'Unable to send upload request' } }); }
+  });
 }
 
 function sendMcp(client, value) { if (client?.socket && !client.socket.destroyed) client.socket.write(`${JSON.stringify(value)}\n`); }

@@ -14,6 +14,7 @@
     "https://*/*",
     "http://127.0.0.1/*"
   ],
+  "optional_permissions": ["debugger"],
   "background": {
     "service_worker": "service-worker.js"
   },

@@ -11,27 +11,29 @@
   <label for="sessions">Session</label>
   <select id="sessions" size="6" aria-label="Pending and approved sessions"></select>
   <section id="details" hidden><strong>Selected session</strong><p id="project"></p><p id="session"></p></section>
-  <p>Proposed origins are supplied by the bridge request. Review them before granting access.</p>
+  <p>Review the requested sites before granting access. This lets the session read pages in your signed-in browser context.</p>
   <button id="preview" disabled>Preview proposed origins</button>
   <section id="previewDetails" hidden><strong>Authorization preview</strong><ul id="tabPreview"></ul><p id="origins"></p></section>
-  <button id="grant" disabled>Confirm and authorize</button>
+  <button id="grant" disabled>Confirm read access</button>
   <button id="revoke" disabled>Revoke selected session</button>
   <section id="clickSection" hidden>
-    <strong>Click access</strong>
+     <strong>Interaction access</strong>
     <p id="clickStatus" role="status"></p>
     <div id="clickRequestNotice" hidden>
-      <p>This session is requesting permission to click and interact with pages, not just read them.</p>
-      <button id="previewClick">Preview click access</button>
+       <p>This session is requesting permission to click and type into fields, not just read pages.</p>
+       <button id="previewClick">Preview interaction access</button>
     </div>
     <section id="clickPreview" hidden>
-      <p id="clickWarning" role="alert">Warning: allowing clicks lets the agent take actions that can change your account or data at these origins (for example submitting forms or making purchases). This grants standing click access for the session below &mdash; you will not be asked to confirm each individual click.</p>
+       <p id="clickWarning" role="alert">Warning: allowing clicks and typing lets the agent take actions that can change your account or data at these origins, including active tabs. This grants standing interaction access for 30 minutes; you will not be asked to confirm each action.</p>
       <p id="clickPreviewScope"></p>
       <p>Origins:</p>
       <ul id="clickPreviewOrigins"></ul>
-      <button id="grantClick" disabled>Confirm allow clicks</button>
+       <button id="grantClick" disabled>Confirm clicks and typing</button>
     </section>
-    <button id="revokeClick" hidden>Revoke click access</button>
+     <button id="revokeClick" hidden>Revoke interaction access</button>
   </section>
+  <section id="visualSection" hidden><strong>Screenshot access</strong><p>Screenshots include all visible pixels, including sensitive fields and embedded pages. They are not redacted.</p><p id="visualStatus" role="status"></p><p id="visualRequest" hidden></p><button id="grantVisual" hidden>Allow screenshots for this tab (30 minutes)</button><button id="revokeVisual" hidden>Revoke screenshot access</button></section>
+  <section id="uploadSection" hidden><strong>File upload request</strong><p>Approving attaches the whole file to the page. That website's scripts can immediately read and transmit it, including to other servers. No publish/submit click is performed by the bridge.</p><p id="uploadDetails"></p><button id="approveUpload">Approve this file</button></section>
   <p id="status" role="status" aria-live="polite"></p>
 </main>
 <script src="popup.js"></script>
