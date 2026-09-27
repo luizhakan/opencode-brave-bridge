@@ -31,10 +31,10 @@ function connectHost(){
   if(nativePort)return;
   try {
     const port=chrome.runtime.connectNative(HOST);
-    nativePort=port; nativeReady=false; nativeError='';
-    port.onMessage.addListener(m=>{ if(m?.event==='ready'&&m.v===2){nativeReady=true;nativeError='';return;} return handleRequest(port,m); });
-    port.onDisconnect.addListener(()=>{ nativeError=chrome.runtime.lastError?.message||'Native host disconnected'; if(nativePort===port){nativePort=null;nativeReady=false;} });
-  } catch(e) { nativeError=String(e?.message||e); nativePort=null; }
+    nativePort=port; nativeReady=false;
+    port.onMessage.addListener(m=>{ if(m?.event==='ready'&&m.v===2){nativeReady=true;nativeError='';chrome.storage.session.remove('__nativeError');return;} return handleRequest(port,m); });
+    port.onDisconnect.addListener(()=>{ nativeError=chrome.runtime.lastError?.message||'Native host disconnected'; chrome.storage.session.set({__nativeError:nativeError}); if(nativePort===port){nativePort=null;nativeReady=false;} });
+  } catch(e) { nativeError=String(e?.message||e);chrome.storage.session.set({__nativeError:nativeError});nativePort=null; }
 }
 async function handleRequest(port,req) {
   if(!req||req.v!==2||typeof req.id!=='string'||req.id.length>256)return;
@@ -57,7 +57,10 @@ async function handleRequest(port,req) {
   } catch(e){respond(port,req,null,e?.code?e:fail('E_OPERATION',String(e?.message||'Operation failed').slice(0,300)));}
 }
 chrome.runtime.onMessage.addListener((m,_s,send)=>{
-  if(m?.type==='get-state'){const previousError=nativeError;if(!nativePort)connectHost();cleanupPending(); send({nativeConnected:nativeReady,nativeError:previousError||nativeError,pending:[...pending].map(([key,p])=>({key,project:p.project,session:p.session,label:label(p.project,p.session)})),grants:[...grants].map(([key,g])=>({key,project:g.project,session:g.session,label:label(g.project,g.session),origins:g.origins}))}); return false;}
+  if(m?.type==='get-state'){
+    (async()=>{const saved=await chrome.storage.session.get('__nativeError');if(!nativePort)connectHost();cleanupPending();send({nativeConnected:nativeReady,nativeError:nativeError||saved.__nativeError||'',pending:[...pending].map(([key,p])=>({key,project:p.project,session:p.session,label:label(p.project,p.session)})),grants:[...grants].map(([key,g])=>({key,project:g.project,session:g.session,label:label(g.project,g.session),origins:g.origins}))});})();
+    return true;
+  }
   if(m?.type==='grant') { const task=grantQueue.then(()=>grantSelected(m.key,m.tabIds,m.origins)); grantQueue=task.catch(()=>{}); task.then(send,e=>send({error:String(e?.message||e)})); return true; }
   if(m?.type==='revoke') { const task=grantQueue.then(()=>revoke(m.key)); grantQueue=task.catch(()=>{}); task.then(send,e=>send({error:String(e?.message||e)})); return true; }
   return false;
